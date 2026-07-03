@@ -36,7 +36,7 @@ Typical targets:
 Inside Claude Code:
 
 ```
-/plugin marketplace add mahdibenamor/claude-migration-planner
+/plugin marketplace add mahdibn54/claude-migration-planner
 /plugin install migration-planner@mahdi-ben-amor
 ```
 
