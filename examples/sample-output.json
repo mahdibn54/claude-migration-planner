@@ -6,14 +6,56 @@
     "deployment_model": "On-prem Tomcat behind nginx, manual deployment via Jenkins (Jenkinsfile present)",
     "complexity_assessment": "Medium-high: 14 Maven modules, 3 of them cyclically coupled through a shared `common` module; single PostgreSQL schema shared by all modules"
   },
+  "current_state": {
+    "detected_versions": [
+      { "component": "java", "version": "1.8", "evidence": "pom.xml <java.version>1.8</java.version>" },
+      { "component": "spring-boot", "version": "2.3.12.RELEASE", "evidence": "pom.xml parent spring-boot-starter-parent" },
+      { "component": "spring-security", "version": "5.3.9", "evidence": "auth-service/pom.xml" },
+      { "component": "hibernate", "version": "5.4.32", "evidence": "managed by Boot 2.3 BOM" },
+      { "component": "angularjs", "version": "1.6.10", "evidence": "frontend/package.json" },
+      { "component": "postgresql-driver", "version": "42.2.14", "evidence": "pom.xml dependencyManagement" }
+    ]
+  },
   "target_state_assumptions": {
-    "target": "Spring Boot 2.3 → Spring Boot 3.3 on Java 21",
+    "target": "Spring Boot 3.3 on Java 21 (user-specified: \"Spring Boot 3\")",
     "assumptions": [
       "Production cannot be fully stopped; rolling deployment required",
       "javax → jakarta namespace migration is mandatory for Boot 3",
       "Team can allocate 2 engineers for the duration of the migration"
     ]
   },
+  "upgrade_path": [
+    { "from": "Java 8", "to": "Java 17", "mandatory": true, "reason": "Spring Boot 3 requires Java 17 minimum; 8 → 17 must land before the Boot 3 jump" },
+    { "from": "Spring Boot 2.3.12", "to": "Spring Boot 2.7.18", "mandatory": true, "reason": "Official migration guide requires passing through 2.7 (last 2.x) before 3.x" },
+    { "from": "Spring Boot 2.7.18", "to": "Spring Boot 3.3.x", "mandatory": true, "reason": "Target version; brings jakarta namespace, Spring Framework 6, Hibernate 6" },
+    { "from": "Java 17", "to": "Java 21", "mandatory": false, "reason": "Boot 3.3 runs on 17; 21 is the current LTS and the stated target runtime" }
+  ],
+  "breaking_changes": [
+    {
+      "change": "javax.* → jakarta.* namespace migration (Servlet, JPA, Validation, Annotation APIs)",
+      "introduced_in": "Spring Boot 3.0",
+      "affected_files": ["common/src/main/java/**/entity/*.java (47 files import javax.persistence)", "auth-service/src/main/java/**/filter/JwtFilter.java (javax.servlet)"],
+      "required_action": "Rewrite imports across all modules; upgrade any third-party lib still shipping javax APIs",
+      "automation_available": "OpenRewrite recipe org.openrewrite.java.migrate.jakarta.JavaxMigrationToJakarta",
+      "source": "https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Migration-Guide"
+    },
+    {
+      "change": "WebSecurityConfigurerAdapter removed; SecurityFilterChain bean style required",
+      "introduced_in": "Spring Security 6 (removed; deprecated in 5.7)",
+      "affected_files": ["auth-service/src/main/java/**/config/WebSecurityConfig.java"],
+      "required_action": "Rewrite security config to component-based lambda DSL",
+      "automation_available": "Partial via OpenRewrite spring-security recipes; manual review required",
+      "source": "https://spring.io/blog/2022/02/21/spring-security-without-the-websecurityconfigureradapter"
+    },
+    {
+      "change": "Hibernate 6 changes sequence-based ID allocation and dialect resolution",
+      "introduced_in": "Hibernate 6.0 (via Boot 3 BOM)",
+      "affected_files": ["common/src/main/java/**/entity/BaseEntity.java (@GeneratedValue(strategy = AUTO))"],
+      "required_action": "Verify generated SQL against the shared PostgreSQL schema before deploying; pin allocationSize explicitly",
+      "automation_available": "none — requires schema verification in staging",
+      "source": "https://github.com/hibernate/hibernate-orm/blob/6.0/migration-guide.adoc"
+    }
+  ],
   "dependency_analysis": [
     {
       "module": "common",
@@ -93,5 +135,11 @@
     "unknown: production traffic volume and peak windows (no observability config found in repo)",
     "unknown: whether external partners consume the SOAP endpoint in legacy-gateway (no consumer registry found)",
     "assumption: PostgreSQL version is 12+ (inferred from docker-compose.yml, not confirmed for production)"
+  ],
+  "sources": [
+    "https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-3.0-Migration-Guide",
+    "https://github.com/spring-projects/spring-boot/wiki/Spring-Boot-2.7-Release-Notes",
+    "https://docs.spring.io/spring-security/reference/migration/index.html",
+    "https://github.com/hibernate/hibernate-orm/blob/6.0/migration-guide.adoc"
   ]
 }

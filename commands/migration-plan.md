@@ -1,19 +1,21 @@
 ---
-description: Analyze this repository and produce an execution-ready, phased migration plan (JSON + human-readable report)
-argument-hint: "[target goal, e.g. 'Spring Boot 2 → 3' or 'monolith → microservices'] [--json-only]"
+description: Inspect this repository and produce a detailed, phased plan to migrate it from its current (auto-detected) versions to the target you specify
+argument-hint: "<target, e.g. 'Java 21', 'Laravel 11', 'Spring Boot 3', 'Angular 18', 'microservices'> [--json-only]"
 ---
 
 Run a full migration planning analysis on the current repository.
 
-Target migration goal (may be empty — infer from evidence if so): $ARGUMENTS
+Target specified by the user (only the destination — current versions are auto-detected from the repo; if empty, infer the most valuable modernization target from evidence): $ARGUMENTS
 
 Steps:
 
-1. Launch the `migration-planner` agent on this repository. Pass it the target goal above verbatim. The agent explores the repo itself (manifests, infra definitions, coupling analysis) and returns a strict-JSON migration plan.
+1. Launch the `migration-planner` agent on this repository. Pass it the target above verbatim. The agent detects current framework/language versions from manifests, researches the official upgrade guides for the exact version gap, maps breaking changes to actual files, and returns a strict-JSON migration plan.
 2. Validate the returned JSON parses. If it doesn't, ask the agent to correct it.
 3. Save the raw JSON to `migration-plan.json` at the repository root.
 4. Unless `--json-only` was passed, also render a human-readable `MIGRATION_PLAN.md` at the repository root from the JSON:
-   - System summary and target state
+   - System summary: detected current versions (with evidence) and target state
+   - Upgrade path (current → intermediate hops → target) and why each hop is mandatory
+   - Breaking changes table: change, affected files in this repo, required action, available automation (codemods/recipes), source link
    - Dependency analysis table (module, risk, priority, evidence)
    - Phased plan with steps, duration, risks, and rollback strategy per phase
    - Critical risks with mitigations
