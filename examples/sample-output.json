@@ -1,0 +1,97 @@
+{
+  "system_summary": {
+    "architecture_type": "Layered monolith (single deployable WAR) with shared relational database",
+    "languages": ["Java 8", "JavaScript (AngularJS 1.6)"],
+    "frameworks": ["Spring Boot 2.3.12", "Spring Data JPA", "Hibernate 5.4", "AngularJS 1.6"],
+    "deployment_model": "On-prem Tomcat behind nginx, manual deployment via Jenkins (Jenkinsfile present)",
+    "complexity_assessment": "Medium-high: 14 Maven modules, 3 of them cyclically coupled through a shared `common` module; single PostgreSQL schema shared by all modules"
+  },
+  "target_state_assumptions": {
+    "target": "Spring Boot 2.3 → Spring Boot 3.3 on Java 21",
+    "assumptions": [
+      "Production cannot be fully stopped; rolling deployment required",
+      "javax → jakarta namespace migration is mandatory for Boot 3",
+      "Team can allocate 2 engineers for the duration of the migration"
+    ]
+  },
+  "dependency_analysis": [
+    {
+      "module": "common",
+      "dependencies": [],
+      "evidence": ["common/pom.xml", "cyclic imports found in billing/src and orders/src"],
+      "risk_level": "high",
+      "migration_priority": 1
+    },
+    {
+      "module": "auth-service",
+      "dependencies": ["common"],
+      "evidence": ["auth-service/pom.xml (spring-security 5.3 — must move to 6.x)"],
+      "risk_level": "medium",
+      "migration_priority": 2
+    },
+    {
+      "module": "billing",
+      "dependencies": ["common", "orders (implicit, via shared `invoices` table)"],
+      "evidence": ["billing/src/main/resources/db/migration", "orders/src/main/java/.../InvoiceRepository.java"],
+      "risk_level": "high",
+      "migration_priority": 4
+    }
+  ],
+  "migration_plan": [
+    {
+      "phase": 1,
+      "name": "Baseline and safety net",
+      "objective": "Make the current system safely upgradeable before touching any framework version",
+      "steps": [
+        "Pin all Maven dependency versions currently resolved transitively (dependencyManagement)",
+        "Add integration tests around the 3 highest-traffic endpoints (evidence: no tests found in billing module)",
+        "Introduce API contract tests between billing and orders to expose the shared-table coupling"
+      ],
+      "estimated_duration_days": 8,
+      "risks": ["Hidden behavior differences surface once tests are added"],
+      "rollback_strategy": ["No production changes in this phase; revert branch only"]
+    },
+    {
+      "phase": 2,
+      "name": "Java 8 → 17 (LTS stepping stone)",
+      "objective": "Upgrade language level without changing Spring Boot major version",
+      "steps": [
+        "Upgrade to Java 17, fix removed-API usages (JAXB, javax.annotation found in common)",
+        "Upgrade Boot 2.3 → 2.7 (last 2.x, required bridge to 3.x)",
+        "Run full regression in staging for one release cycle"
+      ],
+      "estimated_duration_days": 12,
+      "risks": ["Reflection-heavy code in common module may break on newer JDK"],
+      "rollback_strategy": ["Blue-green deploy; keep Java 8 artifacts published for one cycle"]
+    },
+    {
+      "phase": 3,
+      "name": "Spring Boot 3 + jakarta namespace",
+      "objective": "Move to Boot 3.3 / Java 21 module by module, lowest-risk first",
+      "steps": [
+        "Run OpenRewrite spring-boot-3 recipe on common, then auth-service, then remaining modules in priority order",
+        "Migrate Spring Security 5 → 6 (lambda DSL) in auth-service",
+        "Upgrade Hibernate 5.4 → 6.x; verify generated SQL against the shared schema before deploy"
+      ],
+      "estimated_duration_days": 18,
+      "risks": ["Hibernate 6 changes ID generation and SQL dialect behavior against the shared database"],
+      "rollback_strategy": ["Deploy per-module; previous WAR kept hot for instant rollback", "Database untouched in this phase — schema changes deferred"]
+    }
+  ],
+  "critical_risks": [
+    {
+      "risk": "billing and orders share the `invoices` table directly",
+      "impact": "Any schema or ORM change in one module can silently corrupt the other's writes",
+      "mitigation": "Introduce a read-facade in phase 1 contract tests; defer schema ownership split until after Boot 3 is stable"
+    }
+  ],
+  "quick_wins": [
+    "Enable Maven build cache and parallel builds (build currently ~14 min per Jenkinsfile timeout settings)",
+    "Remove 6 unused dependencies flagged in common/pom.xml"
+  ],
+  "unknowns_and_assumptions": [
+    "unknown: production traffic volume and peak windows (no observability config found in repo)",
+    "unknown: whether external partners consume the SOAP endpoint in legacy-gateway (no consumer registry found)",
+    "assumption: PostgreSQL version is 12+ (inferred from docker-compose.yml, not confirmed for production)"
+  ]
+}

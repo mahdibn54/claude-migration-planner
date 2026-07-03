@@ -1,0 +1,14 @@
+{
+  "name": "mahdi-ben-amor",
+  "owner": {
+    "name": "Mahdi Ben Amor",
+    "email": "mahdi.benamor@medianet.com.tn"
+  },
+  "plugins": [
+    {
+      "name": "migration-planner",
+      "source": "./",
+      "description": "Evidence-based enterprise migration planning agent. Analyzes real repositories and produces execution-ready, phased migration plans as structured JSON — dependency graphs, risk analysis, rollback strategies."
+    }
+  ]
+}

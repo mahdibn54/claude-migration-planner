@@ -1,0 +1,20 @@
+{
+  "name": "migration-planner",
+  "version": "1.0.0",
+  "description": "Evidence-based enterprise migration planning agent. Analyzes real repositories and produces execution-ready, phased migration plans as structured JSON — dependency graphs, risk analysis, rollback strategies. No generic advice.",
+  "author": {
+    "name": "Mahdi Ben Amor",
+    "email": "mahdi.benamor@medianet.com.tn"
+  },
+  "keywords": [
+    "migration",
+    "modernization",
+    "legacy",
+    "refactoring",
+    "architecture",
+    "java",
+    "spring-boot",
+    "microservices",
+    "strangler-pattern"
+  ]
+}
