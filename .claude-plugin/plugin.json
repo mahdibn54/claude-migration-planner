@@ -1,7 +1,7 @@
 {
   "name": "migration-planner",
-  "version": "1.0.0",
-  "description": "Evidence-based enterprise migration planning agent. Analyzes real repositories and produces execution-ready, phased migration plans as structured JSON — dependency graphs, risk analysis, rollback strategies. No generic advice.",
+  "version": "1.2.0",
+  "description": "Evidence-based enterprise migration planning agent. Analyzes real repositories and produces execution-ready, phased migration plans as structured JSON — dependency graphs, risk analysis, EOL detection, exit criteria, rollback strategies. No generic advice.",
   "author": {
     "name": "Mahdi Ben Amor",
     "email": "mahdi.benamor@medianet.com.tn"
@@ -10,11 +10,20 @@
     "migration",
     "modernization",
     "legacy",
+    "upgrade",
+    "breaking-changes",
     "refactoring",
     "architecture",
+    "technical-debt",
+    "end-of-life",
     "java",
     "spring-boot",
+    "laravel",
+    "django",
+    "dotnet",
+    "angular",
     "microservices",
+    "monorepo",
     "strangler-pattern"
   ]
 }

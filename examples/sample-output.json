@@ -1,4 +1,15 @@
 {
+  "executive_summary": {
+    "headline": "Spring Boot 2.3 on Java 8 (both past end-of-life) can reach Boot 3.3 on Java 21 in three phases over ~38 working days with 2 engineers; the dominant risk is the shared invoices table between billing and orders",
+    "total_estimated_duration_days": 38,
+    "recommended_team_size": 2,
+    "overall_confidence": "medium",
+    "top_risks": [
+      "billing and orders share the `invoices` table — schema/ORM changes can silently corrupt cross-module writes",
+      "Java 8 and Spring Boot 2.3 are past EOL — no security patches while the migration runs",
+      "billing module has no tests — no safety net for regression detection"
+    ]
+  },
   "system_summary": {
     "architecture_type": "Layered monolith (single deployable WAR) with shared relational database",
     "languages": ["Java 8", "JavaScript (AngularJS 1.6)"],
@@ -8,12 +19,12 @@
   },
   "current_state": {
     "detected_versions": [
-      { "component": "java", "version": "1.8", "evidence": "pom.xml <java.version>1.8</java.version>" },
-      { "component": "spring-boot", "version": "2.3.12.RELEASE", "evidence": "pom.xml parent spring-boot-starter-parent" },
-      { "component": "spring-security", "version": "5.3.9", "evidence": "auth-service/pom.xml" },
-      { "component": "hibernate", "version": "5.4.32", "evidence": "managed by Boot 2.3 BOM" },
-      { "component": "angularjs", "version": "1.6.10", "evidence": "frontend/package.json" },
-      { "component": "postgresql-driver", "version": "42.2.14", "evidence": "pom.xml dependencyManagement" }
+      { "component": "java", "version": "1.8", "evidence": "pom.xml <java.version>1.8</java.version>", "detection_confidence": "high", "eol": true },
+      { "component": "spring-boot", "version": "2.3.12.RELEASE", "evidence": "pom.xml parent spring-boot-starter-parent", "detection_confidence": "high", "eol": true },
+      { "component": "spring-security", "version": "5.3.9", "evidence": "auth-service/pom.xml", "detection_confidence": "high", "eol": true },
+      { "component": "hibernate", "version": "5.4.32", "evidence": "managed by Boot 2.3 BOM (not pinned directly)", "detection_confidence": "medium", "eol": true },
+      { "component": "angularjs", "version": "1.6.10", "evidence": "frontend/package.json (no lockfile committed)", "detection_confidence": "medium", "eol": true },
+      { "component": "postgresql-driver", "version": "42.2.14", "evidence": "pom.xml dependencyManagement", "detection_confidence": "high", "eol": false }
     ]
   },
   "target_state_assumptions": {
@@ -90,6 +101,13 @@
         "Introduce API contract tests between billing and orders to expose the shared-table coupling"
       ],
       "estimated_duration_days": 8,
+      "confidence": "high",
+      "parallelizable_with": [],
+      "exit_criteria": [
+        "Integration tests for the 3 highest-traffic endpoints green in CI",
+        "Contract tests between billing and orders running on every merge",
+        "All transitive dependency versions pinned in dependencyManagement"
+      ],
       "risks": ["Hidden behavior differences surface once tests are added"],
       "rollback_strategy": ["No production changes in this phase; revert branch only"]
     },
@@ -103,6 +121,12 @@
         "Run full regression in staging for one release cycle"
       ],
       "estimated_duration_days": 12,
+      "confidence": "medium",
+      "parallelizable_with": [],
+      "exit_criteria": [
+        "Full build and test suite green on Java 17 / Boot 2.7 in CI",
+        "One full release cycle in staging with error rate at Java 8 baseline"
+      ],
       "risks": ["Reflection-heavy code in common module may break on newer JDK"],
       "rollback_strategy": ["Blue-green deploy; keep Java 8 artifacts published for one cycle"]
     },
@@ -116,6 +140,13 @@
         "Upgrade Hibernate 5.4 → 6.x; verify generated SQL against the shared schema before deploy"
       ],
       "estimated_duration_days": 18,
+      "confidence": "medium",
+      "parallelizable_with": [],
+      "exit_criteria": [
+        "All modules on Boot 3.3 / jakarta namespace, build green in CI",
+        "Hibernate 6 generated SQL verified against the shared schema in staging",
+        "Production error rate at pre-migration baseline for 7 days"
+      ],
       "risks": ["Hibernate 6 changes ID generation and SQL dialect behavior against the shared database"],
       "rollback_strategy": ["Deploy per-module; previous WAR kept hot for instant rollback", "Database untouched in this phase — schema changes deferred"]
     }
@@ -125,6 +156,11 @@
       "risk": "billing and orders share the `invoices` table directly",
       "impact": "Any schema or ORM change in one module can silently corrupt the other's writes",
       "mitigation": "Introduce a read-facade in phase 1 contract tests; defer schema ownership split until after Boot 3 is stable"
+    },
+    {
+      "risk": "Java 8, Spring Boot 2.3, Spring Security 5.3, and AngularJS 1.6 are all past end-of-life",
+      "impact": "No security patches ship for these versions; every day on them is unpatched exposure, and CVE remediation may force emergency upgrades mid-migration",
+      "mitigation": "Treat the migration as security work, not just modernization; monitor CVE feeds for the EOL components until phase 3 completes"
     }
   ],
   "quick_wins": [
